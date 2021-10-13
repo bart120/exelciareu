@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  admin:
+    image: phpmyadmin:latest
+    ports:
+      - 8000:80
+    environment:
+      PMA_PORT: 3306
+      MYSQL_ROOT_PASSWORD: ${ROOT_PASSWORD}
+      PMA_HOST: database
+    depends_on:
+      - database
+    networks:
+      - backend
+      - frontend
+
+  database:
+    image: mysql:latest
+    environment:
+      MYSQL_ROOT_PASSWORD: ${ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DEFAULT_DB}
+      MYSQL_USER: bob
+      MYSQL_PASSWORD: exelcia
+    #ports:
+    #  - 3306:3306
+    volumes:
+      - d:\data:/var/lib/mysql
+    restart: always
+    networks:
+      - backend
+    #deploy:
+    #  mode: replicated
+    #  replicas: 4
+
+  bof:
+    image: wordpress:latest
+    networks:
+      - backend
+      - frontend
+    ports: 
+      - 80:80
+    environment:
+      WORDPRESS_DB_HOST: database
+      WORDPRESS_DB_USER: bob
+      WORDPRESS_DB_PASSWORD: exelcia
+      WORDPRESS_DB_NAME: ${DEFAULT_DB}
+      WORDPRESS_TABLE_PREFIX: wp 
+
+networks:
+  backend:
+    name: reseau-backend
+  frontend:
+    name: reseau-frontend
+
+  #database-perso:
+  #  build: image/.
+  #  environment:
+  #    MYSQL_ROOT_PASSWORD: ${ROOT_PASSWORD}
+  #    MYSQL_DATABASE: ${DEFAULT_DB}
+  #    MYSQL_USER: bob
+  #    MYSQL_PASSWORD: exelcia
+  #    MY_FILE: 
+  #  ports:
+  #    - 3306:3306
+  #  volumes:
+  #    - d:\data-perso:/var/lib/mysql
+  #  restart: always
+  
+#volumes:
+#  db-data:d:\data
