@@ -1,0 +1,358 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: api
+---
+#rabbitmq
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq-deployment
+  namespace: api
+  labels:
+    app: rabbitmq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq-app
+          image: rabbitmq:3-management
+          ports:
+            - containerPort: 15672
+            - containerPort: 5672
+          resources:
+            requests:
+              memory: "300M"
+              cpu: "0.2"
+            limits:
+              memory: "1000M"
+              cpu: "1"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-service
+  namespace: api
+  labels:
+    app: rabbitmq
+spec:
+  type: ClusterIP
+  selector:
+    app: rabbitmq
+  ports: 
+    - name: port5672
+      port: 5672
+      protocol: TCP
+      targetPort: 5672
+    - name: port15672
+      port: 15672
+      protocol: TCP
+      targetPort: 15672
+---
+#database
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sql-deployment
+  namespace: api
+  labels:
+    app: sql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sql
+  template:
+    metadata:
+      labels:
+        app: sql
+    spec:
+      containers:
+        - name: sql-app
+          image: bart120/yv-database:1
+          ports:
+            - containerPort: 1433
+          resources:
+            limits:
+              memory: "1000M"
+              cpu: "1"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sql-service
+  namespace: api
+  labels:
+    app: sql
+spec:
+  type: ClusterIP
+  selector:
+    app: sql
+  ports: 
+    - port: 1433
+---
+#redis
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-deployment
+  namespace: api
+  labels:
+    app: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis-app
+          image: redis
+          ports:
+            - containerPort: 6379
+          resources:
+            limits:
+              memory: "1000M"
+              cpu: "1"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: api
+  labels:
+    app: redis
+spec:
+  type: ClusterIP
+  selector:
+    app: redis
+  ports: 
+    - port: 6379
+
+---
+#api identity
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-identity-deployment
+  namespace: api
+  labels:
+    app: api-identity
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-identity
+  template:
+    metadata:
+      labels:
+        app: api-identity
+    spec:
+      containers:
+        - name: api-identity-app
+          image: bart120/yv-api-identity:1
+          ports:
+            - containerPort: 80
+          resources:
+            limits:
+              memory: "1000M"
+              cpu: "1"
+          env:
+            - name: RedisHost
+              value: "redis-service:6379"
+            - name: HostRabbitmq
+              value: "rabbitmq-service"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-identity-service
+  namespace: api
+  labels:
+    app: api-identity
+spec:
+  type: ClusterIP
+  #externalName: service-api-identity
+  selector:
+    app: api-identity
+  ports: 
+    - port: 80
+
+---
+#api applicants
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-applicants-deployment
+  namespace: api
+  labels:
+    app: api-applicants
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-applicants
+  template:
+    metadata:
+      labels:
+        app: api-applicants
+    spec:
+      containers:
+        - name: api-applicants-app
+          image: bart120/yv-api-applicants:1
+          ports:
+            - containerPort: 80
+          resources:
+            limits:
+              memory: "1000M"
+              cpu: "1"
+          env:
+            - name: ConnectionString
+              value: "Server=sql-service;User=sa;Password=Pass@word;Database=dotnetgigs.applicants;"
+            - name: HostRabbitmq
+              value: "rabbitmq-service"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-applicants-service
+  namespace: api
+  labels:
+    app: api-applicants
+spec:
+  type: ClusterIP
+  selector:
+    app: api-applicants
+  ports: 
+    - port: 80
+
+---
+#API JOBS
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-jobs-deployment
+  namespace: api
+  labels:
+    app: api-jobs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-jobs
+  template:
+    metadata:
+      labels:
+        app: api-jobs
+    spec:
+      containers:
+        - name: api-jobs-app
+          image: bart120/yv-api-jobs:2
+          ports:
+            - containerPort: 80
+          resources:
+            limits:
+              memory: "1000M"
+              cpu: "1"
+          env:
+            - name: ConnectionString
+              value: "Server=sql-service;User=sa;Password=Pass@word;Database=dotnetgigs.jobs;"
+            - name: HostRabbitmq
+              value: "rabbitmq-service"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-jobs-service
+  namespace: api
+  labels:
+    app: api-jobs
+spec:
+  type: ClusterIP
+  #externalName: api-jobs-service.exemple.com
+  selector:
+    app: api-jobs
+  ports: 
+    - port: 80
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: web
+---
+# WEB
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-deployment
+  namespace: web
+  labels:
+    app: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web-app
+          image: bart120/yv-web:2
+          ports:
+            - containerPort: 80
+          resources:
+            limits:
+              memory: "1000M"
+              cpu: "1"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-service
+  namespace: web
+  labels:
+    app: web
+spec:
+  type: ClusterIP
+  selector:
+    app: web
+  ports: 
+    - port: 80
+
+---
+#ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-web
+  namespace: web
+  annotations:
+    konghq.com/strip-path: "true"
+    kubernetes.io/ingress.class: "kong"
+spec:
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: web-service
+            port: 
+              number: 80
+        path: /
+        pathType: Prefix
+      
